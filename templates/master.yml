@@ -1,0 +1,55 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Parameters:
+  DeploymentStageName:
+    Type: String
+    Default: prod
+    Description: the name of the stage
+Resources:
+  WebsiteBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Delete
+    Properties:
+      AccessControl: PublicRead
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: aws:kms
+      BucketName: aws-refarch-website
+      WebsiteConfiguration:
+        ErrorDocument: 404.js
+        IndexDocument: index.js
+  ScoresApi:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: ScoresApi
+  ApiGatewayDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - GetScores
+    Properties:
+      Description: Api Gateway deployment (flesh this out please)
+      RestApiId: !Ref ScoresApi
+      StageName: !Ref DeploymentStageName
+  GetScores:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      HttpMethod: GET
+      ResourceId: !GetAtt [ScoresApi, RootResourceId]
+      RestApiId: !Ref ScoresApi
+  Prod:
+    Type: AWS::ApiGateway::Stage
+    Properties:
+      DeploymentId: !Ref ApiGatewayDeployment
+      MethodSettings:
+        - ResourcePath: /
+          HttpMethod: GET
+          MetricsEnabled: True
+        - ResourcePath: /
+          HttpMethod: POST
+          MetricsEnabled: True
+      RestApiId: !Ref ScoresApi
+      StageName: !Ref DeploymentStageName
+Outputs:
+  WebsiteURL:
+    Value: !GetAtt [WebsiteBucket, WebsiteURL]
+#  potentially use the AWS::ApiGateway::DomainName resource type to use a custom endpoint url
