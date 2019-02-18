@@ -1,0 +1,150 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Outputs:
+  WebsiteURL:
+    Value:
+      Fn::GetAtt:
+      - WebsiteBucket
+      - WebsiteURL
+Resources:
+  ApiGatewayDeployment:
+    DependsOn:
+    - GetScores
+    - PostScore
+    Properties:
+      Description: Api Gateway deployment (flesh this out please)
+      RestApiId:
+        Ref: ScoresApi
+      StageName: DummyStage
+    Type: AWS::ApiGateway::Deployment
+  GetScores:
+    Properties:
+      AuthorizationType: NONE
+      HttpMethod: GET
+      Integration:
+        IntegrationHttpMethod: GET
+        Type: AWS
+        Uri:
+          Fn::Join:
+          - ''
+          - - 'arn:aws:apigateway:'
+            - Ref: AWS::Region
+            - :lambda:path/2015-03-31/functions/
+            - Fn::GetAtt:
+              - GetScoresLambda
+              - Arn
+            - /invocations
+      ResourceId:
+        Ref: ScoresResource
+      RestApiId:
+        Ref: ScoresApi
+    Type: AWS::ApiGateway::Method
+  GetScoresInvokePermissions:
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName:
+        Fn::GetAtt:
+        - GetScoresLambda
+        - Arn
+      Principal: s3.amazonaws.com
+      SourceAccount:
+        Ref: AWS::AccountId
+      SourceArn:
+        Fn::GetAtt:
+        - WebsiteBucket
+        - Arn
+    Type: AWS::Lambda::Permission
+  GetScoresLambda:
+    Properties:
+      Code:
+        ZipFile: fileb://../functions/get-scores.zip
+      Handler: get-scores.handler
+      Role: arn:aws:iam::852207075430:role/lambda_basic_execution
+      Runtime: nodejs8.10
+    Type: AWS::Lambda::Function
+  GetScoresStage:
+    Properties:
+      DeploymentId:
+        Ref: ApiGatewayDeployment
+      MethodSettings:
+      - HttpMethod: GET
+        MetricsEnabled: true
+        ResourcePath: /scores
+      - HttpMethod: POST
+        MetricsEnabled: true
+        ResourcePath: /scores
+      RestApiId:
+        Ref: ScoresApi
+      StageName: LATEST
+    Type: AWS::ApiGateway::Stage
+  PostScore:
+    Properties:
+      AuthorizationType: NONE
+      HttpMethod: POST
+      Integration:
+        IntegrationHttpMethod: POST
+        Type: AWS
+        Uri:
+          Fn::Join:
+          - ''
+          - - 'arn:aws:apigateway:'
+            - Ref: AWS::Region
+            - :lambda:path/2015-03-31/functions/
+            - Fn::GetAtt:
+              - PostScoreLambda
+              - Arn
+            - /invocations
+      ResourceId:
+        Ref: ScoresResource
+      RestApiId:
+        Ref: ScoresApi
+    Type: AWS::ApiGateway::Method
+  PostScoreInvokePermissions:
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName:
+        Fn::GetAtt:
+        - PostScoreLambda
+        - Arn
+      Principal: s3.amazonaws.com
+      SourceAccount:
+        Ref: AWS::AccountId
+      SourceArn:
+        Fn::GetAtt:
+        - WebsiteBucket
+        - Arn
+    Type: AWS::Lambda::Permission
+  PostScoreLambda:
+    Properties:
+      Code:
+        ZipFile: fileb://../functions/post-score.zip
+      Handler: post-score.handler
+      Role: arn:aws:iam::852207075430:role/lambda_basic_execution
+      Runtime: nodejs8.10
+    Type: AWS::Lambda::Function
+  ScoresApi:
+    Properties:
+      Name: ScoresApi
+    Type: AWS::ApiGateway::RestApi
+  ScoresResource:
+    Properties:
+      ParentId:
+        Fn::GetAtt:
+        - ScoresApi
+        - RootResourceId
+      PathPart: scores
+      RestApiId:
+        Ref: ScoresApi
+    Type: AWS::ApiGateway::Resource
+  WebsiteBucket:
+    DeletionPolicy: Delete
+    Properties:
+      AccessControl: PublicRead
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+        - ServerSideEncryptionByDefault:
+            SSEAlgorithm: aws:kms
+      BucketName: aws-refarch-website
+      WebsiteConfiguration:
+        ErrorDocument: 404.js
+        IndexDocument: index.js
+    Type: AWS::S3::Bucket

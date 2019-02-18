@@ -1,9 +1,4 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Parameters:
-  DeploymentStageName:
-    Type: String
-    Default: prod
-    Description: the name of the stage
 Resources:
   WebsiteBucket:
     Type: AWS::S3::Bucket
@@ -22,34 +17,108 @@ Resources:
     Type: AWS::ApiGateway::RestApi
     Properties:
       Name: ScoresApi
-  ApiGatewayDeployment:
-    Type: AWS::ApiGateway::Deployment
-    DependsOn:
-      - GetScores
-    Properties:
-      Description: Api Gateway deployment (flesh this out please)
-      RestApiId: !Ref ScoresApi
-      StageName: !Ref DeploymentStageName
-  GetScores:
-    Type: AWS::ApiGateway::Method
-    Properties:
-      HttpMethod: GET
-      ResourceId: !GetAtt [ScoresApi, RootResourceId]
-      RestApiId: !Ref ScoresApi
-  Prod:
+  GetScoresStage:
     Type: AWS::ApiGateway::Stage
     Properties:
       DeploymentId: !Ref ApiGatewayDeployment
       MethodSettings:
-        - ResourcePath: /
+        - ResourcePath: /scores
           HttpMethod: GET
           MetricsEnabled: True
-        - ResourcePath: /
+        - ResourcePath: /scores
           HttpMethod: POST
           MetricsEnabled: True
       RestApiId: !Ref ScoresApi
-      StageName: !Ref DeploymentStageName
+      StageName: LATEST
+  ScoresResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ScoresApi
+      ParentId: !GetAtt [ScoresApi, RootResourceId]
+      PathPart: scores
+  GetScores:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      AuthorizationType: NONE
+      HttpMethod: GET
+      ResourceId: !Ref ScoresResource
+      RestApiId: !Ref ScoresApi
+      Integration:
+        Type: AWS
+        IntegrationHttpMethod: GET
+        Uri:
+          !Join [
+            "",
+            [
+              "arn:aws:apigateway:",
+              !Ref "AWS::Region",
+              ":lambda:path/2015-03-31/functions/",
+              !GetAtt [GetScoresLambda, Arn],
+              /invocations,
+            ],
+          ]
+  PostScore:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      AuthorizationType: NONE
+      HttpMethod: POST
+      ResourceId: !Ref ScoresResource
+      RestApiId: !Ref ScoresApi
+      Integration:
+        Type: AWS
+        IntegrationHttpMethod: POST
+        Uri:
+          !Join [
+            "",
+            [
+              "arn:aws:apigateway:",
+              !Ref "AWS::Region",
+              ":lambda:path/2015-03-31/functions/",
+              !GetAtt [PostScoreLambda, Arn],
+              /invocations,
+            ],
+          ]
+  GetScoresLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Handler: get-scores.handler
+      Code:
+        ZipFile: fileb://../functions/get-scores.zip
+      Runtime: nodejs8.10
+      Role: arn:aws:iam::852207075430:role/lambda_basic_execution
+  PostScoreLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Handler: post-score.handler
+      Runtime: nodejs8.10
+      Code:
+        ZipFile: fileb://../functions/post-score.zip
+      Role: arn:aws:iam::852207075430:role/lambda_basic_execution
+  GetScoresInvokePermissions:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt [GetScoresLambda, Arn]
+      Action: "lambda:InvokeFunction"
+      Principal: s3.amazonaws.com
+      SourceAccount: !Ref "AWS::AccountId"
+      SourceArn: !GetAtt [WebsiteBucket, Arn]
+  PostScoreInvokePermissions:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt [PostScoreLambda, Arn]
+      Action: "lambda:InvokeFunction"
+      Principal: s3.amazonaws.com
+      SourceAccount: !Ref "AWS::AccountId"
+      SourceArn: !GetAtt [WebsiteBucket, Arn]
+  ApiGatewayDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - GetScores
+      - PostScore
+    Properties:
+      Description: Api Gateway deployment (flesh this out please)
+      RestApiId: !Ref ScoresApi
+      StageName: DummyStage
 Outputs:
   WebsiteURL:
     Value: !GetAtt [WebsiteBucket, WebsiteURL]
-#  potentially use the AWS::ApiGateway::DomainName resource type to use a custom endpoint url
