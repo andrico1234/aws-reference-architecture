@@ -56,7 +56,8 @@ Resources:
   GetScoresLambda:
     Properties:
       Code:
-        ZipFile: fileb://../functions/get-scores.zip
+        S3Bucket: refarch-functions
+        S3Key: get-scores.zip
       Handler: get-scores.handler
       Role: arn:aws:iam::852207075430:role/lambda_basic_execution
       Runtime: nodejs8.10
@@ -116,7 +117,8 @@ Resources:
   PostScoreLambda:
     Properties:
       Code:
-        ZipFile: fileb://../functions/post-score.zip
+        S3Bucket: refarch-functions
+        S3Key: post-score.zip
       Handler: post-score.handler
       Role: arn:aws:iam::852207075430:role/lambda_basic_execution
       Runtime: nodejs8.10

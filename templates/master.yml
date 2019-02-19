@@ -34,7 +34,9 @@ Resources:
     Type: AWS::ApiGateway::Resource
     Properties:
       RestApiId: !Ref ScoresApi
-      ParentId: !GetAtt [ScoresApi, RootResourceId]
+      ParentId: !GetAtt
+        - ScoresApi
+        - RootResourceId
       PathPart: scores
   GetScores:
     Type: AWS::ApiGateway::Method
@@ -83,7 +85,8 @@ Resources:
     Properties:
       Handler: get-scores.handler
       Code:
-        ZipFile: fileb://../functions/get-scores.zip
+        S3Bucket: refarch-functions
+        S3Key: get-scores.zip
       Runtime: nodejs8.10
       Role: arn:aws:iam::852207075430:role/lambda_basic_execution
   PostScoreLambda:
@@ -92,7 +95,8 @@ Resources:
       Handler: post-score.handler
       Runtime: nodejs8.10
       Code:
-        ZipFile: fileb://../functions/post-score.zip
+        S3Bucket: refarch-functions
+        S3Key: post-score.zip
       Role: arn:aws:iam::852207075430:role/lambda_basic_execution
   GetScoresInvokePermissions:
     Type: AWS::Lambda::Permission

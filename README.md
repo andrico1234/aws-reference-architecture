@@ -6,10 +6,11 @@ A repository that will be used to quickly provision architectures that use S3, L
 [x] Provision S3 bucket
 [x] Deploy static site to S3 bucket
 [x] Create Lambda functions
-[x] Deploy Lambda functions
+[ ] Upload Lambda functions to S3
 [x] Create API Gateway resources
 [x] Connect Lambda functions to API Gateway resources
 [ ] Hit Lambda endpoint from static site
+[ ] Create a Lambda that updates-stack when the S3 bucket is updated
 [ ] Create DynamoDB resource via CloudFormation
 [ ] Populate table with fake data
 [ ] Access DB via Lambda
