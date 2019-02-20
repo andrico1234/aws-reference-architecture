@@ -16,12 +16,28 @@ Resources:
         Ref: ScoresApi
       StageName: DummyStage
     Type: AWS::ApiGateway::Deployment
+  CloudWatchRole:
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Action: sts:AssumeRole
+          Effect: Allow
+          Principal:
+            Service:
+            - apigateway.amazonaws.com
+        Version: '2012-10-17'
+      ManagedPolicyArns:
+      - arn:aws:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs
+      Path: /
+    Type: AWS::IAM::Role
   GetScores:
     Properties:
       AuthorizationType: NONE
       HttpMethod: GET
       Integration:
-        IntegrationHttpMethod: GET
+        IntegrationHttpMethod: POST
+        IntegrationResponses:
+        - StatusCode: '200'
         Type: AWS
         Uri:
           Fn::Join:
@@ -33,6 +49,8 @@ Resources:
               - GetScoresLambda
               - Arn
             - /invocations
+      MethodResponses:
+      - StatusCode: '200'
       ResourceId:
         Ref: ScoresResource
       RestApiId:
@@ -45,13 +63,9 @@ Resources:
         Fn::GetAtt:
         - GetScoresLambda
         - Arn
-      Principal: s3.amazonaws.com
-      SourceAccount:
-        Ref: AWS::AccountId
+      Principal: apigateway.amazonaws.com
       SourceArn:
-        Fn::GetAtt:
-        - WebsiteBucket
-        - Arn
+        Fn::Sub: arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ScoresApi}/*/*
     Type: AWS::Lambda::Permission
   GetScoresLambda:
     Properties:
@@ -83,6 +97,8 @@ Resources:
       HttpMethod: POST
       Integration:
         IntegrationHttpMethod: POST
+        IntegrationResponses:
+        - StatusCode: '200'
         Type: AWS
         Uri:
           Fn::Join:
@@ -94,6 +110,8 @@ Resources:
               - PostScoreLambda
               - Arn
             - /invocations
+      MethodResponses:
+      - StatusCode: '200'
       ResourceId:
         Ref: ScoresResource
       RestApiId:
@@ -106,13 +124,9 @@ Resources:
         Fn::GetAtt:
         - PostScoreLambda
         - Arn
-      Principal: s3.amazonaws.com
-      SourceAccount:
-        Ref: AWS::AccountId
+      Principal: apigateway.amazonaws.com
       SourceArn:
-        Fn::GetAtt:
-        - WebsiteBucket
-        - Arn
+        Fn::Sub: arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ScoresApi}/*/*
     Type: AWS::Lambda::Permission
   PostScoreLambda:
     Properties:
@@ -127,6 +141,13 @@ Resources:
     Properties:
       Name: ScoresApi
     Type: AWS::ApiGateway::RestApi
+  ScoresApiGatewayAccount:
+    Properties:
+      CloudWatchRoleArn:
+        Fn::GetAtt:
+        - CloudWatchRole
+        - Arn
+    Type: AWS::ApiGateway::Account
   ScoresResource:
     Properties:
       ParentId:

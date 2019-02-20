@@ -5,9 +5,14 @@ import Layout from "../components/layout";
 import Button from "../components/button";
 
 const handleClick = () => {
-  // make a request to API gateway
-  console.log('clicked');
-}
+  fetch("")
+    .then(res => {
+      console.log("success", res.data);
+    })
+    .catch(err => {
+      console.log(err);
+    });
+};
 
 const IndexPage = () => (
   <Layout>

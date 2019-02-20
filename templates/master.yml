@@ -13,6 +13,24 @@ Resources:
       WebsiteConfiguration:
         ErrorDocument: 404.js
         IndexDocument: index.js
+  CloudWatchRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - "apigateway.amazonaws.com"
+            Action: "sts:AssumeRole"
+      Path: "/"
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs"
+  ScoresApiGatewayAccount:
+    Type: AWS::ApiGateway::Account
+    Properties:
+      CloudWatchRoleArn: !GetAtt [CloudWatchRole, Arn]
   ScoresApi:
     Type: AWS::ApiGateway::RestApi
     Properties:
@@ -45,9 +63,11 @@ Resources:
       HttpMethod: GET
       ResourceId: !Ref ScoresResource
       RestApiId: !Ref ScoresApi
+      MethodResponses:
+        - StatusCode: "200"
       Integration:
         Type: AWS
-        IntegrationHttpMethod: GET
+        IntegrationHttpMethod: POST
         Uri:
           !Join [
             "",
@@ -59,6 +79,8 @@ Resources:
               /invocations,
             ],
           ]
+        IntegrationResponses:
+          - StatusCode: "200"
   PostScore:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -66,6 +88,8 @@ Resources:
       HttpMethod: POST
       ResourceId: !Ref ScoresResource
       RestApiId: !Ref ScoresApi
+      MethodResponses:
+        - StatusCode: "200"
       Integration:
         Type: AWS
         IntegrationHttpMethod: POST
@@ -80,6 +104,8 @@ Resources:
               /invocations,
             ],
           ]
+        IntegrationResponses:
+          - StatusCode: "200"
   GetScoresLambda:
     Type: AWS::Lambda::Function
     Properties:
@@ -101,19 +127,17 @@ Resources:
   GetScoresInvokePermissions:
     Type: AWS::Lambda::Permission
     Properties:
-      FunctionName: !GetAtt [GetScoresLambda, Arn]
       Action: "lambda:InvokeFunction"
-      Principal: s3.amazonaws.com
-      SourceAccount: !Ref "AWS::AccountId"
-      SourceArn: !GetAtt [WebsiteBucket, Arn]
+      FunctionName: !GetAtt [GetScoresLambda, Arn]
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ScoresApi}/*/*"
   PostScoreInvokePermissions:
     Type: AWS::Lambda::Permission
     Properties:
-      FunctionName: !GetAtt [PostScoreLambda, Arn]
       Action: "lambda:InvokeFunction"
-      Principal: s3.amazonaws.com
-      SourceAccount: !Ref "AWS::AccountId"
-      SourceArn: !GetAtt [WebsiteBucket, Arn]
+      FunctionName: !GetAtt [PostScoreLambda, Arn]
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ScoresApi}/*/*"
   ApiGatewayDeployment:
     Type: AWS::ApiGateway::Deployment
     DependsOn:
