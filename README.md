@@ -12,7 +12,7 @@ A repository that will be used to quickly provision architectures that use S3, L
 [ ] Hit Lambda endpoint from static site
 [ ] Create an SNS topic that S3 bucket publishes and Lambda subscribes to
 [ ] Create a Lambda that updates-stack when the S3 bucket is updated
-[ ] Create DynamoDB resource via CloudFormation
+[x] Create DynamoDB resource via CloudFormation
 [ ] Populate table with fake data
 [ ] Access DB via Lambda
 [ ] Get scores via Lambda

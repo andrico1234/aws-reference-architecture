@@ -1,4 +1,9 @@
 AWSTemplateFormatVersion: "2010-09-09"
+# Parameters:
+#   Nonce:
+#     Description: Change this string when code is updated.
+#     Type: String
+#     Default: "Test"
 Resources:
   WebsiteBucket:
     Type: AWS::S3::Bucket
@@ -13,6 +18,7 @@ Resources:
       WebsiteConfiguration:
         ErrorDocument: 404.js
         IndexDocument: index.js
+
   CloudWatchRole:
     Type: AWS::IAM::Role
     Properties:
@@ -27,14 +33,17 @@ Resources:
       Path: "/"
       ManagedPolicyArns:
         - "arn:aws:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs"
+
   ScoresApiGatewayAccount:
     Type: AWS::ApiGateway::Account
     Properties:
       CloudWatchRoleArn: !GetAtt [CloudWatchRole, Arn]
+
   ScoresApi:
     Type: AWS::ApiGateway::RestApi
     Properties:
       Name: ScoresApi
+
   GetScoresStage:
     Type: AWS::ApiGateway::Stage
     Properties:
@@ -48,6 +57,7 @@ Resources:
           MetricsEnabled: True
       RestApiId: !Ref ScoresApi
       StageName: LATEST
+
   ScoresResource:
     Type: AWS::ApiGateway::Resource
     Properties:
@@ -56,6 +66,7 @@ Resources:
         - ScoresApi
         - RootResourceId
       PathPart: scores
+
   GetScores:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -65,6 +76,12 @@ Resources:
       RestApiId: !Ref ScoresApi
       MethodResponses:
         - StatusCode: "200"
+          ResponseModels:
+            application/json: "Empty"
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
       Integration:
         Type: AWS
         IntegrationHttpMethod: POST
@@ -81,6 +98,11 @@ Resources:
           ]
         IntegrationResponses:
           - StatusCode: "200"
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+              method.response.header.Access-Control-Allow-Methods: "'GET'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+
   PostScore:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -90,6 +112,12 @@ Resources:
       RestApiId: !Ref ScoresApi
       MethodResponses:
         - StatusCode: "200"
+          ResponseModels:
+            application/json: "Empty"
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
       Integration:
         Type: AWS
         IntegrationHttpMethod: POST
@@ -106,6 +134,40 @@ Resources:
           ]
         IntegrationResponses:
           - StatusCode: "200"
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+              method.response.header.Access-Control-Allow-Methods: "'POST'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+
+  OptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      AuthorizationType: NONE
+      HttpMethod: OPTIONS
+      ResourceId: !Ref ScoresResource
+      RestApiId: !Ref ScoresApi
+      Integration:
+        IntegrationResponses:
+          - StatusCode: "200"
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+              method.response.header.Access-Control-Allow-Methods: "'GET, POST, OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+            ResponseTemplates:
+              application/json: ""
+        PassthroughBehavior: WHEN_NO_MATCH
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        Type: MOCK
+      MethodResponses:
+        - StatusCode: "200"
+          ResponseModels:
+            application/json: "Empty"
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: false
+            method.response.header.Access-Control-Allow-Methods: false
+            method.response.header.Access-Control-Allow-Origin: false
+
   GetScoresLambda:
     Type: AWS::Lambda::Function
     Properties:
@@ -124,6 +186,7 @@ Resources:
         S3Bucket: refarch-functions
         S3Key: post-score.zip
       Role: arn:aws:iam::852207075430:role/lambda_basic_execution
+
   GetScoresInvokePermissions:
     Type: AWS::Lambda::Permission
     Properties:
@@ -131,6 +194,7 @@ Resources:
       FunctionName: !GetAtt [GetScoresLambda, Arn]
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ScoresApi}/*/*"
+
   PostScoreInvokePermissions:
     Type: AWS::Lambda::Permission
     Properties:
@@ -138,15 +202,75 @@ Resources:
       FunctionName: !GetAtt [PostScoreLambda, Arn]
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ScoresApi}/*/*"
+
   ApiGatewayDeployment:
     Type: AWS::ApiGateway::Deployment
     DependsOn:
       - GetScores
       - PostScore
+      - OptionsMethod
     Properties:
-      Description: Api Gateway deployment (flesh this out please)
       RestApiId: !Ref ScoresApi
       StageName: DummyStage
+
+  ScoresTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: userId
+          AttributeType: S
+        - AttributeName: score
+          AttributeType: N
+        - AttributeName: dateAdded
+          AttributeType: S
+        - AttributeName: name
+          AttributeType: S
+      BillingMode: PROVISIONED
+      GlobalSecondaryIndexes:
+        - IndexName: ScoreGSI
+          KeySchema:
+            - AttributeName: name
+              KeyType: HASH
+            - AttributeName: score
+              KeyType: RANGE
+          Projection:
+            ProjectionType: KEYS_ONLY
+          ProvisionedThroughput:
+            ReadCapacityUnits: 2
+            WriteCapacityUnits: 2
+      KeySchema:
+        - AttributeName: userId
+          KeyType: HASH
+        - AttributeName: score
+          KeyType: RANGE
+      LocalSecondaryIndexes:
+        - IndexName: DateAddedLSI
+          KeySchema:
+            - AttributeName: userId
+              KeyType: HASH
+            - AttributeName: dateAdded
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      ProvisionedThroughput:
+        ReadCapacityUnits: 2
+        WriteCapacityUnits: 2
+      SSESpecification:
+        SSEEnabled: True
+      TableName: ScoresTable
+
+  # GetScoresDeploymentTrigger:
+  #   Type: Custom::Resource
+  #   Properties:
+  #     ServiceToken: !GetAtt [GetScoresLambda, Arn]
+  #     Nonce: !Ref Nonce
+  # PostScoreDeploymentTrigger:
+  #   Type: Custom::Resource
+  #   Properties:
+  #     ServiceToken: !GetAtt [PostScoreLambda, Arn]
+  #     Nonce: !Ref Nonce
 Outputs:
   WebsiteURL:
     Value: !GetAtt [WebsiteBucket, WebsiteURL]
+  DynamoDBArn:
+    Value: !GetAtt [ScoresTable, Arn]

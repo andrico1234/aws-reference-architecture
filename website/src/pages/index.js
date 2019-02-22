@@ -5,7 +5,7 @@ import Layout from "../components/layout";
 import Button from "../components/button";
 
 const handleClick = () => {
-  fetch("")
+  fetch("https://li5evsdez9.execute-api.eu-west-2.amazonaws.com/LATEST/scores")
     .then(res => {
       console.log("success", res.data);
     })
